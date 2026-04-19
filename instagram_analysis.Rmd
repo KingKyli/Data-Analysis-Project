@@ -1,0 +1,640 @@
+---
+title: "Exploratory Data Analysis of the Instagram Reach Dataset"
+author: "Sotiris Kylintireas-3220098  "
+date: "2026-03-17"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: false
+    theme: cosmo
+    df_print: paged
+  word_document:
+    toc: true
+    toc_depth: '2'
+  pdf_document:
+    toc: true
+    toc_depth: '2'
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE
+)
+
+library(knitr)
+library(kableExtra)
+```
+
+
+
+## Εισαγωγή
+
+Στην παρούσα εργασία πραγματοποιείται διερευνητική ανάλυση δεδομένων (*Exploratory Data Analysis - EDA*) στο dataset *Instagram Reach*, με σκοπό τη μελέτη των βασικών χαρακτηριστικών των μεταβλητών και των μεταξύ τους σχέσεων.
+
+Αρχικά διενεργείται έλεγχος και προεπεξεργασία των δεδομένων, ενώ στη συνέχεια πραγματοποιείται κατασκευή νέων κατηγορικών μεταβλητών και υπολογισμός περιγραφικών στατιστικών μέτρων. Η ανάλυση συμπληρώνεται με τη χρήση κατάλληλων γραφικών παραστάσεων, οι οποίες συμβάλλουν στην κατανόηση της κατανομής των δεδομένων και στη διερεύνηση των σχέσεων μεταξύ ποσοτικών και κατηγορικών μεταβλητών.
+
+Παράλληλα, εξετάζεται η δυνατότητα αξιοποίησης βασικών μεταβλητών, όπως ο αριθμός των `Followers` και ο χρόνος από τη δημοσίευση (`Hours.since.posted`), για την πρόβλεψη υψηλής αλληλεπίδρασης (*high engagement*) σε μια ανάρτηση, μέσω της εφαρμογής απλού στατιστικού μοντέλου ταξινόμησης. Με τον τρόπο αυτό, η ανάλυση επεκτείνεται πέραν της περιγραφικής προσέγγισης, ενσωματώνοντας στοιχεία προβλεπτικής μοντελοποίησης.
+
+
+
+## Άσκηση 1: Έλεγχος μεταβλητών
+
+```{r}
+instagram_reach <- read.table(
+  "C:/Users/anezi/Downloads/Εργαστηριακή άσκηση 1/instagram_reach.txt",
+  header = TRUE,
+  stringsAsFactors = FALSE
+)
+
+
+```
+
+Αρχικά ελέγχουμε τη δομή και τις διαστάσεις του dataset.
+
+```{r}
+str(instagram_reach)
+dim(instagram_reach)
+```
+
+Αφαιρούμε την πρώτη στήλη (`S.No`), καθώς δεν είναι χρήσιμη.
+
+```{r}
+instagram_reach <- instagram_reach[, -1]
+
+str(instagram_reach)
+dim(instagram_reach)
+```
+Στη συνέχεια, ορίζουμε τον κατάλληλο τύπο για τις μεταβλητές όπου χρειάζεται.
+
+```{r}
+instagram_reach$USERNAME <- as.factor(instagram_reach$USERNAME)
+instagram_reach$Caption <- as.character(instagram_reach$Caption)
+instagram_reach$Hashtags <- as.character(instagram_reach$Hashtags)
+
+str(instagram_reach)
+```
+Το αρχικό dataset περιείχε 100 παρατηρήσεις και 7 μεταβλητές.  
+Η μεταβλητή `S.No` αφαιρέθηκε, καθώς λειτουργεί μόνο ως αριθμός εγγραφής και δεν προσφέρει χρήσιμη πληροφορία για την ανάλυση.  
+Το τελικό dataset περιλαμβάνει 100 παρατηρήσεις και 6 μεταβλητές.  
+Οι μεταβλητές `Followers`, `Hours.since.posted` και `Likes` είναι ποσοτικές (αριθμητικές) και κατάλληλες για στατιστική ανάλυση.
+
+## Άσκηση 2: Δημιουργία νέων μεταβλητών
+
+### Δημιουργία μεταβλητής time
+
+```{r}
+instagram_reach$time <- ifelse(instagram_reach$Hours.since.posted == 2, 2,
+                        ifelse(instagram_reach$Hours.since.posted == 3, 3, 4))
+
+instagram_reach$time <- as.factor(instagram_reach$time)
+```
+
+Έλεγχος μεταβλητής:
+```{r}
+time_table <- as.data.frame(table(instagram_reach$time))
+kable(time_table,
+      col.names = c("time", "Συχνότητα"),
+      caption = "Κατανομή της μεταβλητής time") %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+Η μεταβλητή `time` κατηγοριοποιεί τις αναρτήσεις ανάλογα με τις ώρες που έχουν περάσει από τη δημοσίευση.
+
+
+
+
+### Δημιουργία μεταβλητής like
+```{r}
+Q1 <- quantile(instagram_reach$Likes, 0.25)
+Q3 <- quantile(instagram_reach$Likes, 0.75)
+
+instagram_reach$like <- ifelse(instagram_reach$Likes < Q1, 1,
+                        ifelse(instagram_reach$Likes <= Q3, 2, 3))
+
+instagram_reach$like <- as.factor(instagram_reach$like)
+```
+
+Η μεταβλητή `like` δημιουργείται με βάση τα τεταρτημόρια της μεταβλητής `Likes`.  
+Οι τιμές μικρότερες από το πρώτο τεταρτημόριο (`Q1`) ανήκουν στην κατηγορία 1,  
+οι ενδιάμεσες τιμές στην κατηγορία 2 και οι μεγαλύτερες από το τρίτο τεταρτημόριο (`Q3`) στην κατηγορία 3.
+
+Έλεγχος μεταβλητής:
+```{r}
+like_table <- as.data.frame(table(instagram_reach$like))
+kable(like_table,
+      col.names = c("like", "Συχνότητα"),
+      caption = "Κατανομή της μεταβλητής like") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+quartiles_table <- data.frame(Q1 = as.numeric(Q1), Q3 = as.numeric(Q3))
+kable(quartiles_table,
+      digits = 2,
+      caption = "Τεταρτημόρια της μεταβλητής Likes") %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+Παρατηρούμε ότι η πλειοψηφία των παρατηρήσεων ανήκει στην κατηγορία 2, δηλαδή στα μεσαία επίπεδα likes, ενώ οι χαμηλές και υψηλές τιμές κατανέμονται σχεδόν ισομερώς. Αυτό είναι λογικό, καθώς η μεταβλητή `like` δημιουργήθηκε με βάση τα τεταρτημόρια της `Likes`, τα οποία χωρίζουν τα δεδομένα σε σχετικά ισομεγέθεις ομάδες.
+
+
+## Άσκηση 3: Ποσοτικές μεταβλητές και περιγραφικά μέτρα
+
+Αρχικά επιλέγουμε τις ποσοτικές μεταβλητές του dataset.
+
+```{r}
+numeric_data <- instagram_reach[, c("Followers", "Hours.since.posted", "Likes")]
+```
+
+Ελέγχουμε τη δομή του νέου dataframe.
+
+```{r}
+str(numeric_data)
+```
+
+Υπολογίζουμε τα βασικά περιγραφικά μέτρα.
+
+```{r}
+summary(numeric_data)
+```
+
+Παράλληλα, υπολογίζουμε τον μέσο όρο,την τυπική απόκλιση και διακύμανση για κάθε ποσοτική μεταβλητή.
+
+```{r}
+mean_table <- data.frame(
+  Μεταβλητή = names(sapply(numeric_data, mean)),
+  Μέσος_Όρος = as.numeric(sapply(numeric_data, mean))
+)
+
+sd_table <- data.frame(
+  Μεταβλητή = names(sapply(numeric_data, sd)),
+  Τυπική_Απόκλιση = as.numeric(sapply(numeric_data, sd))
+)
+
+var_table <- data.frame(
+  Μεταβλητή = names(sapply(numeric_data, var)),
+  Διακύμανση = as.numeric(sapply(numeric_data, var))
+)
+
+kable(mean_table,
+      digits = 2,
+      caption = "Μέσος όρος ποσοτικών μεταβλητών") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+kable(sd_table,
+      digits = 2,
+      caption = "Τυπική απόκλιση ποσοτικών μεταβλητών") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+kable(var_table,
+      digits = 2,
+      caption = "Διακύμανση ποσοτικών μεταβλητών") %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+Παρατηρούμε ότι η μεταβλητή `Followers` παρουσιάζει μεγάλη διασπορά, γεγονός που υποδηλώνει σημαντικές διαφορές στον αριθμό ακολούθων μεταξύ των χρηστών.
+
+Αντίστοιχα, τα `Likes` εμφανίζουν επίσης μεταβλητότητα, ενώ η μεταβλητή `Hours.since.posted` έχει μικρότερη διασπορά, καθώς οι περισσότερες τιμές συγκεντρώνονται σε χαμηλά επίπεδα.
+
+## Άσκηση 4: Γραφική μελέτη της μεταβλητής Followers
+
+Για τη μεταβλητή `Followers` κατασκευάζουμε ιστόγραμμα με καμπύλη , θηκόγραμμα και QQ plot με σκοπό την μελέτη  της κατανομής και την ύπαρξη outlier.
+
+```{r}
+plot_hist_density <- function(x, var_name) {
+  hist(x,
+       probability = TRUE,
+       col = "lightblue",
+       border = "white",
+       main = paste("Ιστόγραμμα της μεταβλητής", var_name),
+       xlab = var_name,
+       ylab = "Πυκνότητα")
+  lines(density(x), lwd = 2)
+}
+
+plot_boxplot <- function(x, var_name) {
+  boxplot(x,
+          col = "lightgreen",
+          main = paste("Θηκόγραμμα της μεταβλητής", var_name),
+          ylab = var_name)
+}
+
+plot_qq <- function(x, var_name) {
+  qqnorm(x,
+         main = paste("QQ Plot της μεταβλητής", var_name),
+         pch = 19)
+  qqline(x, lwd = 2)
+}
+```
+
+### Ιστόγραμμα με καμπύλη πυκνότητας
+
+```{r}
+plot_hist_density(instagram_reach$Followers, "Followers")
+```
+
+### Θηκόγραμμα
+
+```{r}
+plot_boxplot(instagram_reach$Followers, "Followers")
+```
+
+### QQ Plot
+
+```{r}
+plot_qq(instagram_reach$Followers, "Followers")
+```
+
+Από το ιστόγραμμα παρατηρούμε ότι η κατανομή της μεταβλητής `Followers` παρουσιάζει έντονη δεξιά ασυμμετρία (positive skewness), καθώς η πλειοψηφία των τιμών συγκεντρώνεται σε χαμηλά επίπεδα, ενώ υπάρχουν λίγες πολύ μεγάλες τιμές.
+
+Το θηκόγραμμα επιβεβαιώνει την ύπαρξη ακραίων τιμών (outliers), κυρίως προς τα δεξιά, γεγονός που ενισχύει την ασυμμετρία της κατανομής.
+
+Στο QQ plot, τα σημεία αποκλίνουν σημαντικά από την ευθεία αναφοράς, ιδιαίτερα στο άνω άκρο, γεγονός που υποδηλώνει ότι η κατανομή δεν ακολουθεί την κανονική κατανομή. Συνεπώς, η μεταβλητή `Followers` δεν είναι κανονικά κατανεμημένη.
+
+## Άσκηση 5: Συχνότητες και γραφήματα για τη μεταβλητή time
+
+Αρχικά υπολογίζουμε τον πίνακα συχνοτήτων και σχετικών συχνοτήτων της μεταβλητής `time`.
+
+```{r}
+freq_time <- table(instagram_reach$time)
+rel_freq_time <- prop.table(freq_time)
+
+freq_time_df <- as.data.frame(freq_time)
+rel_freq_time_df <- data.frame(
+  time = names(rel_freq_time),
+  Σχετική_Συχνότητα = as.numeric(rel_freq_time)
+)
+
+kable(freq_time_df,
+      col.names = c("time", "Συχνότητα"),
+      caption = "Πίνακας συχνοτήτων της μεταβλητής time") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+kable(rel_freq_time_df,
+      digits = 2,
+      caption = "Πίνακας σχετικών συχνοτήτων της μεταβλητής time") %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+### Ραβδόγραμμα
+
+```{r}
+plot_bar <- function(freq, var_name) {
+  barplot(freq,
+          col = "lightcoral",
+          main = paste("Ραβδόγραμμα της μεταβλητής", var_name),
+          xlab = var_name,
+          ylab = "Συχνότητα")
+}
+
+plot_bar(freq_time, "time")
+```
+
+### Διάγραμμα πίτας
+
+```{r}
+plot_pie <- function(freq, var_name) {
+  labels <- paste(names(freq), " (", freq, ")", sep = "")
+  
+  pie(freq,
+      labels = labels,
+      col = rainbow(length(freq)),
+      main = paste("Διάγραμμα πίτας της μεταβλητής", var_name))
+}
+
+plot_pie(freq_time, "time")
+```
+
+Από τον πίνακα συχνοτήτων φαίνεται ξεκάθαρα ότι η κατηγορία `time = 2` κυριαρχεί, αφού συγκεντρώνει πάνω από τις μισές παρατηρήσεις. Με άλλα λόγια, τα περισσότερα posts στο dataset είναι αρκετά πρόσφατα.
+
+Το ραβδόγραμμα κάνει αυτή τη διαφορά ακόμα πιο εμφανή, καθώς η πρώτη στήλη είναι αισθητά ψηλότερη από τις υπόλοιπες.
+
+Στο διάγραμμα πίτας βλέπουμε την ίδια εικόνα και αναλογικά: πάνω από το μισό “κομμάτι” ανήκει στο `time = 2`, ενώ οι κατηγορίες `3` και `4` μοιράζονται το υπόλοιπο. Συνολικά, το dataset φαίνεται να δίνει μεγαλύτερη έμφαση σε πιο πρόσφατες αναρτήσεις.
+
+## Άσκηση 6: Διερεύνηση σχέσης μεταξύ ποσοτικών μεταβλητών
+### i. Πίνακας συσχέτισης
+
+Υπολογίζουμε τον πίνακα γραμμικών συσχετίσεων μεταξύ των ποσοτικών μεταβλητών.
+
+```{r}
+cor_matrix <- cor(numeric_data)
+
+kable(cor_matrix,
+      digits = 3,
+      caption = "Πίνακας Συσχέτισης") %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+Από τον πίνακα συσχέτισης φαίνεται ότι υπάρχει μια θετική σχέση μεταξύ των μεταβλητών `Followers` και `Likes`, κάτι που είναι λογικό καθώς όσο αυξάνονται οι followers ενός χρήστη, συνήθως αυξάνονται και τα likes.
+
+Η σχέση αυτή όμως δεν εμφανίζεται ιδιαίτερα ισχυρή (≈0.27), άρα δεν μπορεί να ειπωθεί ακριβώς οτι η μία μεταβλητή εξηγείται πλήρως από την άλλη.
+
+Αντίθετα, πιο έντονη είναι η συσχέτιση μεταξύ `Likes` και `Hours.since.posted` (≈0.61), γεγονός που δείχνει ότι οι δύο μεταβλητές συνδέονται θετικά και ότι υψηλότερες τιμές της μίας τείνουν να εμφανίζονται μαζί με υψηλότερες τιμές της άλλης.
+
+### ii. Scatterplot Likes vs Followers
+
+```{r}
+plot_scatter <- function(x, y, x_name, y_name) {
+  plot(x, y,
+       pch = 19,
+       col = "darkblue",
+       main = paste("Scatterplot:", y_name, "vs", x_name),
+       xlab = x_name,
+       ylab = y_name)
+}
+
+plot_scatter(instagram_reach$Followers,
+             instagram_reach$Likes,
+             "Followers",
+             "Likes")
+```
+Στο scatterplot παρατηρούμε ότι η πλειοψηφία των σημείων συγκεντρώνεται σε χαμηλές τιμές τόσο των `Followers` όσο και των `Likes`, ενώ τα σημεία είναι αρκετά διάσπαρτα και δεν σχηματίζουν καθαρή γραμμική σχέση. Το γράφημα, επομένως, δεν δείχνει ισχυρή σχέση μεταξύ των δύο μεταβλητών, κάτι που συμφωνεί και με τον σχετικά χαμηλό συντελεστή συσχέτισης.
+
+Επιπλέον, εμφανίζονται ορισμένες ακραίες παρατηρήσεις, κυρίως περιπτώσεις με πολλούς followers αλλά σχετικά λίγα likes, γεγονός που δείχνει ότι ο αριθμός των followers δεν αρκεί από μόνος του για να εξηγήσει πλήρως τα likes.
+### iii. Scatterplot χρωματισμένος βάσει time
+
+```{r}
+plot_scatter_color <- function(x, y, group, x_name, y_name, group_name) {
+  
+  colors <- c("red", "green", "blue")
+  group_factor <- as.factor(group)
+  
+  plot(x, y,
+       pch = 19,
+       col = colors[group_factor],
+       main = paste("Scatterplot:", y_name, "vs", x_name),
+       xlab = x_name,
+       ylab = y_name)
+  
+  legend("topleft",
+         legend = levels(group_factor),
+         col = colors,
+         pch = 19,
+         title = group_name)
+}
+
+plot_scatter_color(instagram_reach$Followers,
+                   instagram_reach$Likes,
+                   instagram_reach$time,
+                   "Followers",
+                   "Likes",
+                   "time")
+```
+
+Με την προσθήκη της μεταβλητής `time`, τα σημεία χωρίζονται σε ομάδες με διαφορετικά χρώματα. Παρόλα αυτά, δεν παρατηρείται κάποιος ξεκάθαρος διαχωρισμός μεταξύ των κατηγοριών.
+
+Οι περισσότερες τιμές συγκεντρώνονται στο `time = 2`, κάτι που φαίνεται και από την πυκνότητα των κόκκινων σημείων. Οι άλλες κατηγορίες εμφανίζονται πιο αραιά.
+
+Συνολικά, η μεταβλητή `time` δεν φαίνεται να αλλάζει ουσιαστικά το γενικό μοτίβο της σχέσης μεταξύ `Followers` και `Likes`, αν και οι κατηγορίες εμφανίζουν διαφορετική πυκνότητα παρατηρήσεων.
+
+Η μεγάλη διασπορά των σημείων υποδηλώνει ότι πιθανόν υπάρχουν και άλλοι παράγοντες που σχετίζονται με τα likes πέρα από τους followers και το χρόνο.
+
+## Άσκηση 7: Σχέση μεταξύ ποσοτικής και κατηγορικής μεταβλητής
+
+Για να μελετήσουμε τη σχέση μεταξύ της ποσοτικής μεταβλητής `Likes` και της κατηγορικής μεταβλητής `time`, κατασκευάζουμε θηκόγραμμα των `Likes` για κάθε κατηγορία του `time`.
+
+```{r}
+plot_box_by_group <- function(y, group, y_name, group_name) {
+  boxplot(y ~ group,
+          col = c("lightblue", "lightgreen", "lightpink"),
+          main = paste("Θηκόγραμμα", y_name, "ανά", group_name),
+          xlab = group_name,
+          ylab = y_name)
+}
+
+plot_box_by_group(instagram_reach$Likes,
+                  instagram_reach$time,
+                  "Likes",
+                  "time")
+```
+
+Από το θηκόγραμμα φαίνεται ότι τα `Likes` διαφέρουν μεταξύ των κατηγοριών της μεταβλητής `time`.
+
+Συγκεκριμένα, η διάμεσος των `Likes` αυξάνεται από την κατηγορία `time = 2` προς την κατηγορία `time = 4`, γεγονός που υποδηλώνει θετική σχέση μεταξύ του χρόνου από τη δημοσίευση και των likes.
+
+Επιπλέον, η διασπορά των τιμών είναι μεγαλύτερη στην κατηγορία `time = 4`, κάτι που φαίνεται από το μεγαλύτερο εύρος του κουτιού και των whiskers. Αυτό δείχνει ότι οι παλαιότερες αναρτήσεις παρουσιάζουν μεγαλύτερη μεταβλητότητα στα likes.
+
+Παρατηρούνται ορισμένες ακραίες τιμές (outliers), κυρίως στις κατηγορίες `time = 3` και `time = 4`, ενώ στο `time = 4` εμφανίζεται και η υψηλότερη τιμή likes.
+
+Συνολικά, παρατηρείται θετική σχέση μεταξύ του χρόνου από τη δημοσίευση και των likes, αν και η σχέση αυτή συνοδεύεται από σημαντική διασπορά.
+
+
+## Άσκηση 8: Σχέση μεταξύ κατηγορικών μεταβλητών
+
+### iv. Πίνακας συνάφειας (time vs like)
+
+Για να μελετήσουμε τη σχέση μεταξύ των κατηγορικών μεταβλητών `time` και `like`, κατασκευάζουμε τον πίνακα συνάφειας.
+
+```{r}
+cont_table <- table(instagram_reach$time, instagram_reach$like)
+
+cont_df <- as.data.frame.matrix(cont_table)
+cont_df$time <- rownames(cont_df)
+rownames(cont_df) <- NULL
+
+cont_df <- cont_df[, c("time", "1", "2", "3")]
+
+kable(cont_df,
+      col.names = c("time", "like=1", "like=2", "like=3"),
+      caption = "Πίνακας συνάφειας μεταξύ time και like") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+
+prop_df <- as.data.frame.matrix(prop.table(cont_table, 1))
+prop_df$time <- rownames(prop_df)
+rownames(prop_df) <- NULL
+
+prop_df <- prop_df[, c("time", "1", "2", "3")]
+
+kable(prop_df,
+      col.names = c("time", "like=1", "like=2", "like=3"),
+      digits = 2,
+      caption = "Σχετικές συχνότητες (ανά time)") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+---
+
+Από τον πίνακα συνάφειας φαίνεται η κατανομή των επιπέδων των `Likes` (χαμηλά, μεσαία, υψηλά) για κάθε κατηγορία του `time`.
+
+Πιο συγκεκριμένα, στην κατηγορία `time = 2` κυριαρχούν τα μεσαία likes (κατηγορία 2), ενώ τα υψηλά likes είναι σχετικά λίγα. Στην κατηγορία `time = 3` η κατανομή είναι πιο ισορροπημένη μεταξύ των τριών επιπέδων.
+
+Αντίθετα, στην κατηγορία `time = 4` παρατηρείται σημαντική αύξηση των υψηλών likes (κατηγορία 3), τα οποία εμφανίζονται με ουσιαστικά την ίδια συχνότητα με τα μεσαία.
+
+Τα αποτελέσματα αυτά επιβεβαιώνονται και από τις σχετικές συχνότητες (`prop.table(cont_table, 1)`), οι οποίες δείχνουν ότι όσο αυξάνεται το `time`, αυξάνεται και το ποσοστό των υψηλών likes.
+
+Συνεπώς, φαίνεται ότι υπάρχει σαφής σχέση μεταξύ `time` και `like`, καθώς η κατανομή των επιπέδων των likes μεταβάλλεται μεταξύ των κατηγοριών του `time`.
+
+
+
+---
+
+### v. Ραβδογράμματα
+
+#### Ομαδοποιημένο ραβδόγραμμα
+
+```{r}
+barplot(cont_table,
+        beside = TRUE,
+        col = c("lightblue", "lightgreen", "lightpink"),
+        legend = rownames(cont_table),
+        main = "Ομαδοποιημένο ραβδόγραμμα (time vs like)",
+        xlab = "like",
+        ylab = "Συχνότητα")
+```
+
+---
+Στο ομαδοποιημένο ραβδόγραμμα μπορούμε να συγκρίνουμε άμεσα τις συχνότητες των κατηγοριών `time` για κάθε επίπεδο του `like`.
+
+Παρατηρούμε ότι στις κατηγορίες `like = 1` και `like = 2` κυριαρχεί η κατηγορία `time = 2`, καθώς εμφανίζει τις μεγαλύτερες συχνότητες. Αντίθετα, στην κατηγορία `like = 3` η μεγαλύτερη συχνότητα εμφανίζεται στο `time = 4`, γεγονός που δείχνει ότι τα υψηλά likes συνδέονται συχνότερα με μεγαλύτερες τιμές του `time`.
+
+Συνεπώς, το γράφημα υποστηρίζει ότι η κατανομή του `like` διαφοροποιείται μεταξύ των κατηγοριών της μεταβλητής `time`.
+
+#### Στοιβαγμένο ραβδόγραμμα
+
+```{r}
+barplot(cont_table,
+        beside = FALSE,
+        col = c("lightblue", "lightgreen", "lightpink"),
+        legend = rownames(cont_table),
+        main = "Στοιβαγμένο ραβδόγραμμα (time vs like)",
+        xlab = "like",
+        ylab = "Συχνότητα")
+
+
+
+
+```
+
+
+
+Στο στοιβαγμένο ραβδόγραμμα φαίνεται πιο καθαρά η συνολική κατανομή των likes και η συμβολή κάθε κατηγορίας `time`. Παρατηρούμε ότι το `time = 2` καταλαμβάνει το μεγαλύτερο μέρος, γεγονός που είναι αναμενόμενο από τα προηγούμενα αποτελέσματα.
+
+
+
+
+Συνολικά, και τα δύο γραφήματα επιβεβαιώνουν ότι υπάρχει σχέση μεταξύ time και like, καθώς η κατανομή των επιπέδων των likes μεταβάλλεται μεταξύ των κατηγοριών του time.
+
+
+
+
+
+## Άσκηση 9: Δημιουργία μεταβλητής υψηλής αλληλεπίδρασης
+
+
+```{r}
+instagram_reach$high_like <- ifelse(instagram_reach$like == 3, 1, 0)
+
+instagram_reach$high_like <- factor(
+  instagram_reach$high_like,
+  levels = c(0, 1),
+  labels = c("Low/Medium Engagement", "High Engagement")
+)
+
+high_like_freq <- as.data.frame(table(instagram_reach$high_like))
+colnames(high_like_freq) <- c("high_like", "Frequency")
+
+high_like_prop <- data.frame(
+  high_like = names(prop.table(table(instagram_reach$high_like))),
+  Relative_Frequency = as.numeric(prop.table(table(instagram_reach$high_like)))
+)
+
+kable(high_like_freq,
+      col.names = c("high_like", "Συχνότητα"),
+      caption = "Κατανομή της μεταβλητής high_like") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+kable(high_like_prop,
+      digits = 2,
+      col.names = c("high_like", "Σχετική Συχνότητα"),
+      caption = "Σχετικές συχνότητες της μεταβλητής high_like") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+Παρατηρούμε ότι περίπου το 23% των αναρτήσεων ανήκει στην κατηγορία υψηλής αλληλεπίδρασης (`high_like = 1`), ενώ η πλειοψηφία (77%) ανήκει στην κατηγορία χαμηλής ή μέτριας αλληλεπίδρασης.
+
+Η ανισορροπία αυτή μεταξύ των κατηγοριών υποδηλώνει ότι το πρόβλημα ταξινόμησης είναι μη ισορροπημένο (imbalanced classification problem), γεγονός που πρέπει να ληφθεί υπόψη κατά την αξιολόγηση των μοντέλων.
+
+## Άσκηση 10: Μοντέλο Λογιστικής Παλινδρόμησης
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+model_logit <- glm(high_like ~ Followers + Hours.since.posted,
+                   data = instagram_reach,
+                   family = binomial)
+
+predicted_prob <- predict(model_logit, type = "response")
+predicted_class <- ifelse(predicted_prob > 0.5, 1, 0)
+
+cm <- table(
+  Predicted = predicted_class,
+  Actual = instagram_reach$high_like
+)
+
+accuracy <- mean(predicted_class == instagram_reach$high_like)
+
+coef_table <- as.data.frame(summary(model_logit)$coefficients)
+coef_table$Variable <- rownames(coef_table)
+rownames(coef_table) <- NULL
+coef_table <- coef_table[, c("Variable", "Estimate", "Std. Error", "z value", "Pr(>|z|)")]
+```
+### Model Summary
+```{r}
+kable(coef_table,
+      digits = 4,
+      col.names = c("Variable", "Estimate", "Std. Error", "z value", "p-value"),
+      caption = "Logistic Regression Coefficients") %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+### Model Evaluation
+The performance of the logistic regression model is summarized below:
+```{r}
+
+
+kable(cm,
+      caption = "Confusion Matrix") %>%
+  kable_styling(full_width = FALSE, position = "center")
+cat("**Model Accuracy:**", round(accuracy * 100, 2), "%")
+
+```
+
+
+Ερμηνεία Αποτελεσμάτων
+
+Για την πρόβλεψη της πιθανότητας υψηλής αλληλεπίδρασης (high_like), εκτιμήθηκε μοντέλο λογιστικής παλινδρόμησης με ανεξάρτητες μεταβλητές τον αριθμό των Followers και τον χρόνο από τη δημοσίευση (Hours.since.posted).
+
+Σύμφωνα με τα αποτελέσματα του μοντέλου:
+
+Η μεταβλητή Hours.since.posted εμφανίζει στατιστικά σημαντική θετική επίδραση (p < 0.01), γεγονός που υποδηλώνει ότι όσο αυξάνεται ο χρόνος από τη δημοσίευση, αυξάνεται και η πιθανότητα εμφάνισης υψηλών likes.
+Η μεταβλητή Followers παρουσιάζει οριακή στατιστική σημαντικότητα (p ≈ 0.076), γεγονός που υποδηλώνει ότι η επίδρασή της είναι ασθενέστερη σε σχέση με τον χρόνο.
+
+Συνεπώς, το μοντέλο υποδεικνύει ότι ο χρόνος από τη δημοσίευση αποτελεί σημαντικότερο παράγοντα για την πρόβλεψη υψηλής αλληλεπίδρασης σε σύγκριση με τον αριθμό των followers.
+
+Η συνολική ακρίβεια του μοντέλου είναι r round(accuracy, 2), δηλαδή το μοντέλο ταξινόμησε σωστά περίπου το r round(accuracy * 100, 2)% των παρατηρήσεων. Ωστόσο, λόγω πιθανής ανισορροπίας μεταξύ των κατηγοριών της μεταβλητής high_like, το μέτρο αυτό θα πρέπει να ερμηνεύεται με προσοχή.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Συμπεράσματα
+
+Από την ανάλυση των δεδομένων προκύπτουν τα εξής βασικά συμπεράσματα:
+
+- Υπάρχει θετική αλλά σχετικά ασθενής συσχέτιση μεταξύ των μεταβλητών `Followers` και `Likes`.
+- Η μεταβλητή `Hours.since.posted` εμφανίζει ισχυρότερη θετική σχέση με τα `Likes` σε σύγκριση με τον αριθμό των followers.
+- Η κατανομή της μεταβλητής `Followers` δεν είναι κανονική, καθώς παρουσιάζει έντονη δεξιά ασυμμετρία και ακραίες τιμές.
+- Η κατηγορική μεταβλητή `time` συνδέεται με την κατανομή των `Likes`, αφού μεγαλύτερες τιμές του `time` σχετίζονται με υψηλότερο ποσοστό υψηλών likes.
+- Η δυαδική μεταβλητή `high_like` έδειξε ότι μόνο ένα σχετικά μικρό ποσοστό των αναρτήσεων χαρακτηρίζεται από υψηλή αλληλεπίδραση, γεγονός που υποδηλώνει ανισορροπία μεταξύ των κατηγοριών.
+- Το μοντέλο λογιστικής παλινδρόμησης έδειξε ότι ο χρόνος από τη δημοσίευση (`Hours.since.posted`) αποτελεί στατιστικά σημαντικό παράγοντα για την πρόβλεψη υψηλής αλληλεπίδρασης, ενώ η επίδραση των `Followers` είναι ασθενέστερη.
+
+Συνολικά, τα αποτελέσματα δείχνουν ότι η αλληλεπίδραση σε μια ανάρτηση δεν εξαρτάται αποκλειστικά από το μέγεθος του λογαριασμού (`Followers`), αλλά επηρεάζεται σε σημαντικό βαθμό και από τον χρόνο που έχει περάσει από τη δημοσίευση. Επιπλέον, η ενσωμάτωση της λογιστικής παλινδρόμησης επεκτείνει την εργασία πέρα από την περιγραφική ανάλυση, προσθέτοντας ένα βασικό αλλά ουσιαστικό στοιχείο προβλεπτικής μοντελοποίησης.
