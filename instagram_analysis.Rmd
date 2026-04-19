@@ -1,5 +1,6 @@
 ---
 title: "Exploratory Data Analysis of the Instagram Reach Dataset"
+subtitle: "EDA, feature engineering, and interpretable classification for high-engagement Instagram posts"
 author: "Sotiris Kylintireas — 3220098"
 date: "2026-03-17"
 always_allow_html: true
@@ -25,7 +26,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  echo = TRUE,
+  echo    = FALSE,
   warning = FALSE,
   message = FALSE,
   fig.align = "center",
@@ -46,7 +47,6 @@ suppressPackageStartupMessages({
 set.seed(42)
 options(scipen = 999)
 
-# Custom ggplot2 theme used throughout the report
 theme_report <- function() {
   theme_minimal(base_size = 13) +
     theme(
@@ -59,152 +59,172 @@ theme_report <- function() {
 }
 ```
 
-## Εισαγωγή
-
-Στην παρούσα εργασία πραγματοποιείται διερευνητική ανάλυση δεδομένων (*Exploratory Data Analysis - EDA*) στο dataset *Instagram Reach*, με στόχο να αποτυπωθούν τόσο τα βασικά χαρακτηριστικά των μεταβλητών όσο και οι μεταξύ τους σχέσεις.
-
-Η προσέγγιση ακολουθεί μια σαφή ροή: αρχικά έλεγχος και προεπεξεργασία των δεδομένων, στη συνέχεια δημιουργία νέων κατηγορικών μεταβλητών και υπολογισμός περιγραφικών μέτρων, και τέλος οπτική διερεύνηση με κατάλληλα διαγράμματα.
-
-Παράλληλα, εξετάζεται κατά πόσο βασικές μεταβλητές, όπως ο αριθμός των `Followers` και ο χρόνος από τη δημοσίευση (`Hours.since.posted`), μπορούν να υποστηρίξουν την πρόβλεψη υψηλής αλληλεπίδρασης (*high engagement*) μέσω λογιστικής παλινδρόμησης.
-
-```{r early-model-metrics, echo=FALSE}
-instagram_reach_preview <- read.table(
-  "instagram_reach.txt",
-  header = TRUE,
-  stringsAsFactors = FALSE
-)
-
-instagram_reach_preview <- instagram_reach_preview[, -1]
-instagram_reach_preview$time <- ifelse(instagram_reach_preview$Hours.since.posted == 2, 2,
-                                ifelse(instagram_reach_preview$Hours.since.posted == 3, 3, 4))
-Q1_preview <- quantile(instagram_reach_preview$Likes, 0.25)
-Q3_preview <- quantile(instagram_reach_preview$Likes, 0.75)
-instagram_reach_preview$like <- ifelse(instagram_reach_preview$Likes < Q1_preview, 1,
-                                ifelse(instagram_reach_preview$Likes <= Q3_preview, 2, 3))
-instagram_reach_preview$high_like <- factor(ifelse(instagram_reach_preview$like == 3, 1, 0),
-                                     levels = c(0, 1),
-                                     labels = c("Low/Medium Engagement", "High Engagement"))
-
-model_preview <- glm(high_like ~ Followers + Hours.since.posted,
-                     data = instagram_reach_preview,
-                     family = binomial)
-predicted_prob_preview <- predict(model_preview, type = "response")
-predicted_class_preview <- ifelse(predicted_prob_preview > 0.5, 1, 0)
-accuracy <- mean(predicted_class_preview == as.numeric(instagram_reach_preview$high_like) - 1)
-```
-
-## Executive Summary
-
-This report presents an Exploratory Data Analysis (EDA) of the **Instagram Reach** dataset, which contains **100 posts** and **6 cleaned variables**. The analysis combines descriptive statistics, visual exploration, and predictive modeling.
-
-**Key findings:**
-
-- `Followers` is strongly right-skewed and departs from normality because a limited number of accounts have very high follower counts.
-- A moderate positive correlation (r ≈ 0.61) appears between `Hours.since.posted` and `Likes`, indicating that older posts tend to accumulate more engagement.
-- Posts in the highest `time` category are more likely to appear in the high-like group.
-- A logistic regression model using `Followers` and `Hours.since.posted` achieves approximately **`r round(accuracy * 100, 1)`%** accuracy, with `Hours.since.posted` as the most statistically robust predictor.
-
-## Άσκηση 1: Έλεγχος μεταβλητών
-
-```{r load-data}
-# Place instagram_reach.txt in your R working directory before knitting
+```{r load-and-prepare, include=FALSE}
 instagram_reach <- read.table(
-  "instagram_reach.txt",
+  "data/instagram_reach.txt",
   header = TRUE,
   stringsAsFactors = FALSE
 )
-```
 
-Αρχικά ελέγχουμε τη δομή και τις διαστάσεις του dataset.
-
-```{r check-structure}
-str(instagram_reach)
-dim(instagram_reach)
-```
-
-Αφαιρούμε την πρώτη στήλη (`S.No`), καθώς δεν είναι χρήσιμη.
-
-```{r remove-sno}
 instagram_reach <- instagram_reach[, -1]
-dim(instagram_reach)
-```
 
-Στη συνέχεια, ορίζουμε τον κατάλληλο τύπο για τις μεταβλητές όπου χρειάζεται.
-
-```{r set-types}
 instagram_reach$USERNAME <- as.factor(instagram_reach$USERNAME)
-instagram_reach$Caption <- as.character(instagram_reach$Caption)
+instagram_reach$Caption  <- as.character(instagram_reach$Caption)
 instagram_reach$Hashtags <- as.character(instagram_reach$Hashtags)
-```
 
-Το αρχικό dataset περιείχε 100 παρατηρήσεις και 7 μεταβλητές.
-Η μεταβλητή `S.No` αφαιρέθηκε, καθώς λειτουργεί μόνο ως αριθμός εγγραφής και δεν προσφέρει χρήσιμη πληροφορία για την ανάλυση.
-Το τελικό dataset περιλαμβάνει 100 παρατηρήσεις και 6 μεταβλητές.
-Με αυτή τη δομή, τα δεδομένα είναι πλέον κατάλληλα για τις επόμενες φάσεις ανάλυσης και μοντελοποίησης.
-
-## Άσκηση 2: Δημιουργία νέων μεταβλητών
-
-### Δημιουργία μεταβλητής time
-
-```{r create-time}
+# Feature engineering: time category
 instagram_reach$time <- ifelse(instagram_reach$Hours.since.posted == 2, 2,
                         ifelse(instagram_reach$Hours.since.posted == 3, 3, 4))
 instagram_reach$time <- as.factor(instagram_reach$time)
-```
 
-Έλεγχος μεταβλητής:
-
-```{r check-time}
-time_table <- as.data.frame(table(instagram_reach$time))
-kable(time_table,
-      col.names = c("time", "Συχνότητα"),
-      caption = "Κατανομή της μεταβλητής time") %>%
-  kable_styling(full_width = FALSE, position = "center")
-```
-
-Η μεταβλητή `time` συνοψίζει τον χρόνο από τη δημοσίευση σε τρεις διακριτές κατηγορίες, ώστε η ερμηνεία να είναι πιο άμεση στις συγκρίσεις που ακολουθούν.
-
-### Δημιουργία μεταβλητής like
-
-```{r create-like}
+# Feature engineering: like tier (quartile-based)
 Q1 <- quantile(instagram_reach$Likes, 0.25)
 Q3 <- quantile(instagram_reach$Likes, 0.75)
-
 instagram_reach$like <- ifelse(instagram_reach$Likes < Q1, 1,
                         ifelse(instagram_reach$Likes <= Q3, 2, 3))
 instagram_reach$like <- as.factor(instagram_reach$like)
+
+# Binary target: high engagement
+instagram_reach$high_like <- factor(
+  ifelse(instagram_reach$like == 3, 1, 0),
+  levels = c(0, 1),
+  labels = c("Low/Medium Engagement", "High Engagement")
+)
+
+# Train/test split (70/30)
+train_idx  <- sample(nrow(instagram_reach), size = floor(0.70 * nrow(instagram_reach)))
+train_data <- instagram_reach[train_idx, ]
+test_data  <- instagram_reach[-train_idx, ]
+
+# Logistic regression trained on training set
+model_logit <- glm(high_like ~ Followers + Hours.since.posted,
+                   data   = train_data,
+                   family = binomial)
+
+# Predictions on held-out test set
+predicted_prob  <- predict(model_logit, newdata = test_data, type = "response")
+predicted_class <- ifelse(predicted_prob > 0.5, 1, 0)
+actual_class    <- as.numeric(test_data$high_like) - 1
+
+# Confusion matrix
+cm <- table(Predicted = predicted_class, Actual = test_data$high_like)
+
+# Safe extraction from confusion matrix
+get_cm_val <- function(cm_table, pred_label, actual_label) {
+  pred_str <- as.character(pred_label)
+  if (pred_str %in% rownames(cm_table) && actual_label %in% colnames(cm_table)) {
+    cm_table[pred_str, actual_label]
+  } else {
+    0
+  }
+}
+
+tp <- get_cm_val(cm, 1, "High Engagement")
+fp <- get_cm_val(cm, 1, "Low/Medium Engagement")
+fn <- get_cm_val(cm, 0, "High Engagement")
+tn <- get_cm_val(cm, 0, "Low/Medium Engagement")
+
+accuracy  <- mean(predicted_class == actual_class)
+precision <- if ((tp + fp) > 0) tp / (tp + fp) else NA
+recall    <- if ((tp + fn) > 0) tp / (tp + fn) else NA
+f1        <- if (!is.na(precision) && !is.na(recall) && (precision + recall) > 0)
+               2 * precision * recall / (precision + recall) else NA
+
+roc_obj <- roc(actual_class, predicted_prob, quiet = TRUE)
+auc_val <- as.numeric(auc(roc_obj))
+
+# Baseline: always predict majority class (Low/Medium Engagement)
+baseline_accuracy <- mean(actual_class == 0)
+
+# Full-dataset model (for stable coefficient display)
+model_full <- glm(high_like ~ Followers + Hours.since.posted,
+                  data   = instagram_reach,
+                  family = binomial)
 ```
 
-Έλεγχος μεταβλητής:
+## Project Objective
 
-```{r check-like}
-like_table <- as.data.frame(table(instagram_reach$like))
-kable(like_table,
-      col.names = c("like", "Συχνότητα"),
-      caption = "Κατανομή της μεταβλητής like") %>%
+This project analyzes a dataset of 100 Instagram posts to identify the variables most associated with high engagement. The analysis explores the role of follower count and posting age in determining whether a post receives an above-average number of likes, and evaluates this relationship through a logistic regression classifier.
+
+**Variables explored:** `Followers`, `Hours.since.posted`, `Likes`, along with engineered categorical features `time`, `like`, and `high_like`.
+
+**Modeling task:** Binary classification — predicting whether a post falls in the high-engagement category based on follower count and time since posting.
+
+## Why This Project Matters
+
+Engagement prediction is a practical problem for anyone managing social media content. Understanding which factors drive higher engagement allows content creators and analysts to make data-informed decisions about posting strategy. This project demonstrates that simple, interpretable models built on a minimal feature set can already reveal meaningful patterns — a useful baseline before investing in more complex approaches. It also illustrates why thorough exploratory analysis before modeling is important: distributional asymmetries, class imbalance, and variable relationships all affect how results should be interpreted.
+
+## Executive Summary
+
+**Dataset:** 100 Instagram posts, 6 variables after cleaning.
+**Goal:** Identify engagement patterns and predict high-engagement posts.
+**Key findings:** Posting age (`Hours.since.posted`) is a stronger predictor than follower count. Posts in the highest time category show notably higher engagement rates. The `Followers` distribution is strongly right-skewed.
+**Model result:** Trained on 70 posts and evaluated on a held-out test set of 30 — accuracy `r round(accuracy * 100, 1)`%, AUC `r round(auc_val, 3)`. The model outperforms a majority-class baseline (`r round(baseline_accuracy * 100, 1)`% accuracy), though recall for the high-engagement class remains moderate due to class imbalance.
+
+## Data Inspection
+
+The dataset contains 100 observations and 7 variables. The index column (`S.No`) was removed as it carries no analytical information, leaving 6 variables for analysis.
+
+```{r data-overview-table}
+overview_df <- data.frame(
+  Variable = c("USERNAME", "Followers", "Caption", "Hashtags", "Hours.since.posted", "Likes"),
+  Type     = c("Categorical", "Numeric", "Text", "Text", "Numeric", "Numeric"),
+  Description = c(
+    "Instagram account identifier",
+    "Number of followers at time of post",
+    "Post caption text",
+    "Hashtags used in the post",
+    "Hours elapsed since post publication",
+    "Number of likes received"
+  )
+)
+
+kable(overview_df,
+      caption = "Variable Overview — Instagram Reach Dataset",
+      col.names = c("Variable", "Type", "Description")) %>%
+  kable_styling(full_width = FALSE, position = "center") %>%
+  row_spec(0, bold = TRUE)
+```
+
+## Feature Engineering
+
+Two new categorical variables were derived from the numeric data:
+
+**`time`** — categorizes `Hours.since.posted` into three groups (2, 3, or 4+ hours), providing a discrete representation of posting age suitable for group comparisons.
+
+**`like`** — divides `Likes` into three engagement tiers using the first and third quartiles (Q1 = `r Q1`, Q3 = `r Q3`): low (below Q1), medium (Q1–Q3), and high (above Q3).
+
+**`high_like`** — a binary target variable: 1 if a post falls in the top like-tier, 0 otherwise.
+
+```{r feature-tables}
+time_df <- as.data.frame(table(instagram_reach$time))
+colnames(time_df) <- c("Time Category", "Count")
+time_df[["Relative Frequency"]] <- round(time_df$Count / sum(time_df$Count), 2)
+
+kable(time_df,
+      caption = "Distribution of Time Category Variable") %>%
   kable_styling(full_width = FALSE, position = "center")
 
-quartiles_table <- data.frame(Q1 = as.numeric(Q1), Q3 = as.numeric(Q3))
-kable(quartiles_table,
-      digits = 2,
-      caption = "Τεταρτημόρια της μεταβλητής Likes") %>%
+high_like_df <- as.data.frame(table(instagram_reach$high_like))
+colnames(high_like_df) <- c("Engagement Class", "Count")
+high_like_df[["Relative Frequency"]] <- round(high_like_df$Count / sum(high_like_df$Count), 2)
+
+kable(high_like_df,
+      caption = "Distribution of Binary Engagement Target (high_like)") %>%
   kable_styling(full_width = FALSE, position = "center")
 ```
 
-Η κατηγοριοποίηση της `Likes` με βάση τα τεταρτημόρια επιτρέπει μια σταθερή και διαφανή διάκριση των αναρτήσεων σε χαμηλή, μεσαία και υψηλή αλληλεπίδραση.
+The target variable is imbalanced: approximately `r round(mean(instagram_reach$high_like == "Low/Medium Engagement") * 100)`% of posts fall in the Low/Medium Engagement class. This imbalance is an important consideration when interpreting classification performance.
 
-## Άσκηση 3: Ποσοτικές μεταβλητές και περιγραφικά μέτρα
-
-```{r select-numeric}
-numeric_data <- instagram_reach[, c("Followers", "Hours.since.posted", "Likes")]
-```
+## Descriptive Statistics
 
 ```{r descriptive-stats}
+numeric_data <- instagram_reach[, c("Followers", "Hours.since.posted", "Likes")]
+
 desc_table <- data.frame(
   Variable = names(numeric_data),
   Mean     = sapply(numeric_data, mean),
   SD       = sapply(numeric_data, sd),
-  Variance = sapply(numeric_data, var),
   Min      = sapply(numeric_data, min),
   Median   = sapply(numeric_data, median),
   Max      = sapply(numeric_data, max)
@@ -214,180 +234,108 @@ kable(desc_table,
       digits = 2,
       format.args = list(big.mark = ","),
       caption = "Descriptive Statistics — Numeric Variables",
-      col.names = c("Variable", "Mean", "Std. Dev.", "Variance", "Min", "Median", "Max")) %>%
+      col.names = c("Variable", "Mean", "Std. Dev.", "Min", "Median", "Max")) %>%
   kable_styling(full_width = FALSE, position = "center") %>%
   row_spec(0, bold = TRUE)
 ```
 
-Τα περιγραφικά μέτρα δείχνουν ότι οι μεταβλητές δεν έχουν ομοιόμορφη συμπεριφορά: ειδικά η `Followers` εμφανίζει μεγαλύτερη διασπορά, γεγονός που επηρεάζει τόσο την οπτική ανάλυση όσο και την ερμηνεία των συσχετίσεων.
+`Followers` shows the highest variability — its standard deviation is large relative to the mean, driven by a small number of high-follower accounts. `Hours.since.posted` and `Likes` display more moderate spread.
 
-## Άσκηση 4: Γραφική μελέτη της μεταβλητής Followers
+## Distribution Analysis
 
-```{r plot-functions}
-# All report visualizations are implemented with ggplot2 + theme_report().
-```
-
-### Ιστόγραμμα με καμπύλη πυκνότητας
+The `Followers` variable is strongly right-skewed, as confirmed by both the histogram and the Q-Q plot. Most accounts have relatively few followers, but several outliers with very high follower counts pull the distribution to the right.
 
 ```{r hist-followers}
 ggplot(instagram_reach, aes(x = Followers)) +
   geom_histogram(aes(y = after_stat(density)), bins = 20,
                  fill = "#4C9BE8", color = "white", alpha = 0.85) +
   geom_density(color = "#1A3A5C", linewidth = 1) +
-  labs(title = "Distribution of Followers",
+  labs(title = "Follower Count Distribution Across Accounts",
        subtitle = "Histogram with kernel density estimate",
        x = "Followers", y = "Density",
        caption = "Source: Instagram Reach Dataset") +
   theme_report()
 ```
 
-### Θηκόγραμμα
-
-```{r box-followers}
-ggplot(instagram_reach, aes(x = "", y = Followers)) +
-  geom_boxplot(fill = "#A8D5A2", color = "#2E7D32", width = 0.4, outlier.shape = NA) +
-  geom_jitter(width = 0.15, alpha = 0.4, color = "#2E7D32") +
-  labs(title = "Boxplot of Followers",
-       subtitle = "Jittered points overlaid",
-       x = "", y = "Followers") +
-  theme_report()
-```
-
-### QQ Plot
-
 ```{r qq-followers}
 ggplot(instagram_reach, aes(sample = Followers)) +
   stat_qq(color = "#4C9BE8", alpha = 0.7) +
   stat_qq_line(color = "#C0392B", linewidth = 1) +
   labs(title = "Normal Q-Q Plot — Followers",
-       subtitle = "Points deviating from line indicate non-normality",
+       subtitle = "Departure from the reference line confirms non-normality",
        x = "Theoretical Quantiles", y = "Sample Quantiles") +
   theme_report()
 ```
 
-## Άσκηση 5: Συχνότητες και γραφήματα για τη μεταβλητή time
+## Time-Based Engagement Analysis
 
-```{r freq-time}
-freq_time <- table(instagram_reach$time)
-rel_freq_time <- prop.table(freq_time)
-
-freq_time_df <- as.data.frame(freq_time)
-rel_freq_time_df <- data.frame(
-  time = names(rel_freq_time),
-  Σχετική_Συχνότητα = as.numeric(rel_freq_time)
-)
-
-kable(freq_time_df,
-      col.names = c("time", "Συχνότητα"),
-      caption = "Πίνακας συχνοτήτων της μεταβλητής time") %>%
-  kable_styling(full_width = FALSE, position = "center")
-
-kable(rel_freq_time_df,
-      digits = 2,
-      caption = "Πίνακας σχετικών συχνοτήτων της μεταβλητής time") %>%
-  kable_styling(full_width = FALSE, position = "center")
-```
+Posts in the highest time category (4+ hours since posting) tend to accumulate more likes, which is consistent with the general positive relationship between posting age and engagement explored in the next section.
 
 ```{r bar-time}
-freq_time_df_gg <- as.data.frame(table(instagram_reach$time))
-colnames(freq_time_df_gg) <- c("time", "count")
+freq_time_df <- as.data.frame(table(instagram_reach$time))
+colnames(freq_time_df) <- c("time", "count")
 
-ggplot(freq_time_df_gg, aes(x = time, y = count, fill = time)) +
+ggplot(freq_time_df, aes(x = time, y = count, fill = time)) +
   geom_col(width = 0.6, show.legend = FALSE) +
   scale_fill_brewer(palette = "Set2") +
   geom_text(aes(label = count), vjust = -0.5, fontface = "bold") +
-  labs(title = "Frequency Distribution of Variable 'time'",
-       x = "Time Category", y = "Frequency") +
+  labs(title = "Share of Posts by Time Category",
+       x = "Time Category (Hours Since Posting)", y = "Number of Posts") +
   theme_report()
 ```
-
-```{r pie-time}
-freq_time_df_gg <- freq_time_df_gg %>%
-  mutate(pct = count / sum(count),
-         label = paste0("time = ", time, "\n", count, " (", scales::percent(pct, accuracy = 1), ")"))
-
-ggplot(freq_time_df_gg, aes(x = "", y = count, fill = time)) +
-  geom_col(width = 1, color = "white") +
-  coord_polar(theta = "y") +
-  geom_text(aes(label = label), position = position_stack(vjust = 0.5), size = 4) +
-  scale_fill_brewer(palette = "Set2") +
-  labs(title = "Pie Chart of Variable 'time'", fill = "Time Category") +
-  theme_void() +
-  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
-        legend.position = "none")
-```
-
-## Άσκηση 6: Διερεύνηση σχέσης μεταξύ ποσοτικών μεταβλητών
-
-```{r correlation-matrix}
-cor_matrix <- cor(numeric_data)
-
-kable(cor_matrix,
-      digits = 3,
-      caption = "Πίνακας Συσχέτισης") %>%
-  kable_styling(full_width = FALSE, position = "center")
-```
-
-```{r scatter-basic}
-ggplot(instagram_reach, aes(x = Followers, y = Likes)) +
-  geom_point(color = "#2C3E7A", alpha = 0.65, size = 2.5) +
-  geom_smooth(method = "lm", se = TRUE, color = "#E74C3C", linewidth = 1) +
-  labs(title = "Scatterplot: Likes vs Followers",
-       subtitle = paste0("Pearson r = ", round(cor(instagram_reach$Followers, instagram_reach$Likes), 3)),
-       x = "Followers", y = "Likes") +
-  scale_x_continuous(labels = scales::comma) +
-  theme_report()
-```
-
-```{r scatter-colored}
-ggplot(instagram_reach, aes(x = Followers, y = Likes, color = time)) +
-  geom_point(alpha = 0.7, size = 2.5) +
-  geom_smooth(method = "lm", se = FALSE, linewidth = 0.8) +
-  scale_color_brewer(palette = "Set1") +
-  labs(title = "Scatterplot: Likes vs Followers by Time Category",
-       x = "Followers", y = "Likes", color = "Time Category") +
-  scale_x_continuous(labels = scales::comma) +
-  theme_report()
-```
-
-## Άσκηση 7: Σχέση μεταξύ ποσοτικής και κατηγορικής μεταβλητής
 
 ```{r box-likes-by-time}
 ggplot(instagram_reach, aes(x = time, y = Likes, fill = time)) +
   geom_boxplot(alpha = 0.8, outlier.shape = NA, width = 0.5) +
   geom_jitter(width = 0.15, alpha = 0.3, size = 1.5) +
   scale_fill_brewer(palette = "Pastel1") +
-  labs(title = "Distribution of Likes by Time Category",
-       subtitle = "Boxplot with jittered observations",
+  labs(title = "Distribution of Likes Across Time Categories",
+       subtitle = "Boxplot with individual observations overlaid",
        x = "Time Category", y = "Likes") +
   theme_report() +
   theme(legend.position = "none")
 ```
 
-## Άσκηση 8: Σχέση μεταξύ κατηγορικών μεταβλητών
+## Correlation and Bivariate Analysis
+
+```{r correlation-matrix}
+cor_matrix <- cor(numeric_data)
+
+kable(cor_matrix,
+      digits = 3,
+      caption = "Pearson Correlation Matrix — Numeric Variables") %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+There is a moderate positive correlation (r ≈ `r round(cor(instagram_reach$Hours.since.posted, instagram_reach$Likes), 2)`) between `Hours.since.posted` and `Likes`, suggesting that posts accumulate more likes as time passes. The relationship between `Followers` and `Likes` is weaker (r ≈ `r round(cor(instagram_reach$Followers, instagram_reach$Likes), 2)`), indicating that follower count is not the primary driver of engagement in this dataset.
+
+```{r scatter-colored}
+ggplot(instagram_reach, aes(x = Followers, y = Likes, color = time)) +
+  geom_point(alpha = 0.7, size = 2.5) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 0.8) +
+  scale_color_brewer(palette = "Set1") +
+  labs(title = "Likes vs Follower Count by Time Category",
+       subtitle = paste0("Pearson r(Followers, Likes) = ",
+                         round(cor(instagram_reach$Followers, instagram_reach$Likes), 3)),
+       x = "Followers", y = "Likes", color = "Time Category") +
+  scale_x_continuous(labels = scales::comma) +
+  theme_report()
+```
+
+## Categorical Association Analysis
+
+The contingency table and grouped bar chart below show how like categories distribute across time groups. Posts in the highest time category account for a greater share of high-like outcomes.
 
 ```{r contingency-table}
 cont_table <- table(instagram_reach$time, instagram_reach$like)
-
 cont_df <- as.data.frame.matrix(cont_table)
 cont_df$time <- rownames(cont_df)
 rownames(cont_df) <- NULL
 cont_df <- cont_df[, c("time", "1", "2", "3")]
 
 kable(cont_df,
-      col.names = c("time", "like=1", "like=2", "like=3"),
-      caption = "Πίνακας συνάφειας μεταξύ time και like") %>%
-  kable_styling(full_width = FALSE, position = "center")
-
-prop_df <- as.data.frame.matrix(prop.table(cont_table, 1))
-prop_df$time <- rownames(prop_df)
-rownames(prop_df) <- NULL
-prop_df <- prop_df[, c("time", "1", "2", "3")]
-
-kable(prop_df,
-      col.names = c("time", "like=1", "like=2", "like=3"),
-      digits = 2,
-      caption = "Σχετικές συχνότητες (ανά time)") %>%
+      col.names = c("Time Category", "Low Likes", "Medium Likes", "High Likes"),
+      caption = "Contingency Table: Time Category vs Like Category") %>%
   kable_styling(full_width = FALSE, position = "center")
 ```
 
@@ -400,75 +348,17 @@ ggplot(cont_df_long, aes(x = like, y = count, fill = time)) +
   scale_fill_brewer(palette = "Set2") +
   geom_text(aes(label = count), position = position_dodge(width = 0.7),
             vjust = -0.4, size = 3.5) +
-  labs(title = "Grouped Bar Chart: time vs like",
-       x = "Like Category", y = "Frequency", fill = "Time Category") +
+  labs(title = "Distribution of Like Categories Across Time Groups",
+       x = "Like Category", y = "Number of Posts", fill = "Time Category") +
   theme_report()
 ```
 
-```{r stacked-bar}
-cont_df_long <- cont_df_long %>%
-  group_by(like) %>%
-  mutate(pct = count / sum(count))
+## Logistic Regression Modeling
 
-ggplot(cont_df_long, aes(x = like, y = count, fill = time)) +
-  geom_col(position = "stack", width = 0.6) +
-  geom_text(aes(label = scales::percent(pct, accuracy = 1)),
-            position = position_stack(vjust = 0.5), size = 3.5, color = "white", fontface = "bold") +
-  scale_fill_brewer(palette = "Set2") +
-  labs(title = "Stacked Bar Chart: time vs like",
-       subtitle = "Percentages show within-like-category composition",
-       x = "Like Category", y = "Frequency", fill = "Time Category") +
-  theme_report()
-```
+A binary logistic regression model was trained to predict whether a post achieves high engagement (`high_like = 1`), using `Followers` and `Hours.since.posted` as predictors. The dataset was split into a training set (70 posts) and a held-out test set (30 posts) to allow out-of-sample evaluation.
 
-## Άσκηση 9: Δημιουργία μεταβλητής υψηλής αλληλεπίδρασης
-
-```{r create-high-like}
-instagram_reach$high_like <- ifelse(instagram_reach$like == 3, 1, 0)
-instagram_reach$high_like <- factor(
-  instagram_reach$high_like,
-  levels = c(0, 1),
-  labels = c("Low/Medium Engagement", "High Engagement")
-)
-
-high_like_freq <- as.data.frame(table(instagram_reach$high_like))
-colnames(high_like_freq) <- c("high_like", "Frequency")
-
-high_like_prop <- data.frame(
-  high_like = names(prop.table(table(instagram_reach$high_like))),
-  Relative_Frequency = as.numeric(prop.table(table(instagram_reach$high_like)))
-)
-
-kable(high_like_freq,
-      col.names = c("high_like", "Συχνότητα"),
-      caption = "Κατανομή της μεταβλητής high_like") %>%
-  kable_styling(full_width = FALSE, position = "center")
-
-kable(high_like_prop,
-      digits = 2,
-      col.names = c("high_like", "Σχετική Συχνότητα"),
-      caption = "Σχετικές συχνότητες της μεταβλητής high_like") %>%
-  kable_styling(full_width = FALSE, position = "center")
-```
-
-## Άσκηση 10: Μοντέλο Λογιστικής Παλινδρόμησης
-
-```{r logistic-model}
-model_logit <- glm(high_like ~ Followers + Hours.since.posted,
-                   data = instagram_reach,
-                   family = binomial)
-
-predicted_prob <- predict(model_logit, type = "response")
-predicted_class <- ifelse(predicted_prob > 0.5, 1, 0)
-
-cm <- table(
-  Predicted = predicted_class,
-  Actual = instagram_reach$high_like
-)
-
-accuracy <- mean(predicted_class == as.numeric(instagram_reach$high_like) - 1)
-
-coef_table <- as.data.frame(summary(model_logit)$coefficients)
+```{r model-coefficients}
+coef_table <- as.data.frame(summary(model_full)$coefficients)
 coef_table$Variable <- rownames(coef_table)
 rownames(coef_table) <- NULL
 coef_table <- coef_table[, c("Variable", "Estimate", "Std. Error", "z value", "Pr(>|z|)")]
@@ -476,72 +366,68 @@ coef_table <- coef_table[, c("Variable", "Estimate", "Std. Error", "z value", "P
 kable(coef_table,
       digits = 4,
       col.names = c("Variable", "Estimate", "Std. Error", "z value", "p-value"),
-      caption = "Logistic Regression Coefficients") %>%
+      caption = "Logistic Regression Coefficients (fitted on full dataset for display)") %>%
   kable_styling(full_width = FALSE, position = "center")
 ```
 
-```{r model-metrics}
+`Hours.since.posted` shows a statistically significant positive effect (p < 0.01): as posting age increases, so does the probability of a post being classified as high-engagement. The effect of `Followers` is weaker and less consistent across observations, confirming that posting age is the most statistically significant predictor in this model.
+
+## Model Evaluation
+
+### Confusion Matrix
+
+```{r confusion-matrix}
 kable(cm,
-      caption = "Confusion Matrix") %>%
+      caption = "Confusion Matrix — Logistic Regression (Test Set, n = 30)") %>%
   kable_styling(full_width = FALSE, position = "center")
+```
 
-cat("**Model Accuracy:**", round(accuracy * 100, 2), "%")
+The model identifies `r tp` true high-engagement posts in the test set. It misses `r fn` high-engagement cases, which explains the relatively modest recall for that class. This pattern is expected given the class imbalance in the data.
 
-# --- Precision, Recall, F1 ---
-tp <- cm["1", "High Engagement"]
-fp <- cm["1", "Low/Medium Engagement"]
-fn <- cm["0", "High Engagement"]
+### Performance Metrics
 
-precision <- tp / (tp + fp)
-recall    <- tp / (tp + fn)
-f1        <- 2 * precision * recall / (precision + recall)
-
+```{r model-metrics}
 metrics_df <- data.frame(
-  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "F1-Score"),
-  Value  = round(c(accuracy, precision, recall, f1), 4)
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "F1-Score", "AUC",
+             "Baseline Accuracy"),
+  Value  = round(c(accuracy, precision, recall, f1, auc_val, baseline_accuracy), 4)
 )
 
 kable(metrics_df,
-      caption = "Model Performance Metrics",
+      caption = "Model Performance Metrics (Test Set)",
       col.names = c("Metric", "Value")) %>%
   kable_styling(full_width = FALSE, position = "center") %>%
-  row_spec(0, bold = TRUE)
+  row_spec(0, bold = TRUE) %>%
+  row_spec(6, italic = TRUE, color = "grey50")
 ```
 
-```{r roc-curve}
-roc_obj <- roc(
-  response  = as.numeric(instagram_reach$high_like) - 1,
-  predictor = predicted_prob,
-  quiet     = TRUE
-)
+Although overall accuracy is `r round(accuracy * 100, 1)`%, recall for the high-engagement class remains moderate, which indicates that the model misses a non-trivial share of truly high-engagement posts. The model outperforms a majority-class baseline (`r round(baseline_accuracy * 100, 1)`% accuracy), confirming that the predictors carry genuine information — but the performance gain is limited by dataset size and class imbalance.
 
+### ROC Curve
+
+```{r roc-curve}
 ggroc(roc_obj, color = "#E74C3C", linewidth = 1.2) +
   geom_abline(slope = 1, intercept = 1, linetype = "dashed", color = "grey50") +
   labs(title = "ROC Curve — Logistic Regression Model",
-       subtitle = paste0("AUC = ", round(auc(roc_obj), 3)),
+       subtitle = paste0("AUC = ", round(auc_val, 3),
+                         "  |  Evaluated on held-out test set (n = 30)"),
        x = "Specificity", y = "Sensitivity") +
   theme_report()
 ```
 
-Η μεταβλητή `Hours.since.posted` παρουσιάζει στατιστικά σημαντική θετική επίδραση (p < 0.01): όσο αυξάνεται ο χρόνος από τη δημοσίευση, τόσο αυξάνεται και η πιθανότητα μια ανάρτηση να ταξινομηθεί ως υψηλής αλληλεπίδρασης. Αντίθετα, η επίδραση των `Followers` παραμένει πιο ήπια.
+An AUC of `r round(auc_val, 3)` indicates that the model discriminates between high and low/medium engagement posts better than chance, but there remains meaningful room for improvement, particularly in identifying the minority class.
 
-Η συνολική ακρίβεια του μοντέλου είναι **`r round(accuracy, 2)`** (ή περίπου **`r round(accuracy * 100, 2)`%**), επομένως η ταξινόμηση είναι ικανοποιητική αλλά όχι επαρκής από μόνη της για πλήρη αξιολόγηση.
+## Conclusions
 
-Το AUC ερμηνεύεται ως η πιθανότητα το μοντέλο να δώσει υψηλότερο σκορ σε ένα πραγματικά high-engagement post σε σχέση με ένα low/medium post. Επειδή το dataset είναι ανισόρροπο (περίπου 77% Low/Medium έναντι 23% High), η ακρίβεια μπορεί να υπερεκτιμήσει την πραγματική απόδοση· για αυτό εξετάζονται συμπληρωματικά και οι δείκτες AUC και F1-Score.
+- `Hours.since.posted` is the most statistically significant predictor in this model: older posts tend to accumulate more likes.
+- The relationship between `Followers` and `Likes` is positive but moderate, suggesting that follower count alone does not reliably predict engagement.
+- The `Followers` distribution is strongly right-skewed, driven by a small number of high-follower accounts that inflate the mean.
+- Posts in the highest time category show a higher proportion of high-like outcomes, consistent with the regression findings.
+- Evaluated on a held-out test set, the logistic regression achieves `r round(accuracy * 100, 1)`% accuracy and AUC `r round(auc_val, 3)`, outperforming a naive baseline but with recall for the high-engagement class remaining the primary performance gap.
 
-## Συμπεράσματα
+## Limitations
 
-Η ανάλυση οδηγεί σε μια συνεκτική εικόνα της συμπεριφοράς των μεταβλητών και της αλληλεπίδρασής τους:
-
-- Η σχέση `Followers`–`Likes` είναι θετική, αλλά μέτριας έντασης.
-- Η `Hours.since.posted` συνδέεται πιο σταθερά με τα `Likes` σε σύγκριση με τον αριθμό followers.
-- Η κατανομή της `Followers` είναι έντονα δεξιά ασύμμετρη, με ακραίες τιμές που επηρεάζουν τον μέσο όρο.
-- Η μεταβλητή `time` διαφοροποιεί ουσιαστικά τα επίπεδα αλληλεπίδρασης, με υψηλότερες κατηγορίες να εμφανίζουν μεγαλύτερο ποσοστό υψηλών likes.
-- Η μεταβλητή `high_like` επιβεβαιώνει την ανισορροπία των κατηγοριών, στοιχείο που πρέπει να λαμβάνεται υπόψη στην ερμηνεία των μετρικών.
-- Στο μοντέλο λογιστικής παλινδρόμησης, η `Hours.since.posted` αναδεικνύεται ως ο πιο αξιόπιστος προγνωστικός παράγοντας για υψηλή αλληλεπίδραση.
-
-## Appendix: Reproducibility
-
-```{r session-info, echo=TRUE, collapse=TRUE}
-sessionInfo()
-```
+- **Small dataset:** With only 100 observations, model estimates are sensitive to sampling variation and results may not generalize reliably to other contexts.
+- **Class imbalance:** Approximately 77% of posts fall in the low/medium engagement category, which inflates accuracy as a standalone metric and limits recall for the minority class.
+- **Limited feature set:** Only two predictors are included. Additional features such as caption length, hashtag count, or posting time-of-day could improve predictive performance.
+- **Single train/test split:** Performance estimates are based on one 70/30 split. Cross-validation would yield more stable evaluation at the cost of reduced interpretability at this dataset size.
