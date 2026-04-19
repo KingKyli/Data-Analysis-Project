@@ -61,11 +61,11 @@ theme_report <- function() {
 
 ## Εισαγωγή
 
-Στην παρούσα εργασία πραγματοποιείται διερευνητική ανάλυση δεδομένων (*Exploratory Data Analysis - EDA*) στο dataset *Instagram Reach*, με σκοπό τη μελέτη των βασικών χαρακτηριστικών των μεταβλητών και των μεταξύ τους σχέσεων.
+Στην παρούσα εργασία πραγματοποιείται διερευνητική ανάλυση δεδομένων (*Exploratory Data Analysis - EDA*) στο dataset *Instagram Reach*, με στόχο να αποτυπωθούν τόσο τα βασικά χαρακτηριστικά των μεταβλητών όσο και οι μεταξύ τους σχέσεις.
 
-Αρχικά διενεργείται έλεγχος και προεπεξεργασία των δεδομένων, ενώ στη συνέχεια πραγματοποιείται κατασκευή νέων κατηγορικών μεταβλητών και υπολογισμός περιγραφικών στατιστικών μέτρων. Η ανάλυση συμπληρώνεται με τη χρήση κατάλληλων γραφικών παραστάσεων, οι οποίες συμβάλλουν στην κατανόηση της κατανομής των δεδομένων και στη διερεύνηση των σχέσεων μεταξύ ποσοτικών και κατηγορικών μεταβλητών.
+Η προσέγγιση ακολουθεί μια σαφή ροή: αρχικά έλεγχος και προεπεξεργασία των δεδομένων, στη συνέχεια δημιουργία νέων κατηγορικών μεταβλητών και υπολογισμός περιγραφικών μέτρων, και τέλος οπτική διερεύνηση με κατάλληλα διαγράμματα.
 
-Παράλληλα, εξετάζεται η δυνατότητα αξιοποίησης βασικών μεταβλητών, όπως ο αριθμός των `Followers` και ο χρόνος από τη δημοσίευση (`Hours.since.posted`), για την πρόβλεψη υψηλής αλληλεπίδρασης (*high engagement*) σε μια ανάρτηση, μέσω της εφαρμογής απλού στατιστικού μοντέλου ταξινόμησης.
+Παράλληλα, εξετάζεται κατά πόσο βασικές μεταβλητές, όπως ο αριθμός των `Followers` και ο χρόνος από τη δημοσίευση (`Hours.since.posted`), μπορούν να υποστηρίξουν την πρόβλεψη υψηλής αλληλεπίδρασης (*high engagement*) μέσω λογιστικής παλινδρόμησης.
 
 ```{r early-model-metrics, echo=FALSE}
 instagram_reach_preview <- read.table(
@@ -95,14 +95,14 @@ accuracy <- mean(predicted_class_preview == as.numeric(instagram_reach_preview$h
 
 ## Executive Summary
 
-This report presents a structured Exploratory Data Analysis (EDA) of the **Instagram Reach** dataset, comprising **100 posts** across **6 variables**. The analysis covers descriptive statistics, distributional assessment, bivariate relationships, and a logistic regression model for predicting high engagement.
+This report presents an Exploratory Data Analysis (EDA) of the **Instagram Reach** dataset, which contains **100 posts** and **6 cleaned variables**. The analysis combines descriptive statistics, visual exploration, and predictive modeling.
 
 **Key findings:**
 
-- The `Followers` variable is heavily right-skewed and non-normal, driven by a small number of high-follower accounts.
-- A moderate positive correlation (r ≈ 0.61) exists between `Hours.since.posted` and `Likes`, suggesting that older posts accumulate more engagement.
-- Posts in the highest `time` category show a disproportionately higher rate of high likes.
-- A logistic regression model using `Followers` and `Hours.since.posted` predicts high engagement with `r round(accuracy * 100, 1)`% accuracy; `Hours.since.posted` is the dominant and statistically significant predictor.
+- `Followers` is strongly right-skewed and departs from normality because a limited number of accounts have very high follower counts.
+- A moderate positive correlation (r ≈ 0.61) appears between `Hours.since.posted` and `Likes`, indicating that older posts tend to accumulate more engagement.
+- Posts in the highest `time` category are more likely to appear in the high-like group.
+- A logistic regression model using `Followers` and `Hours.since.posted` achieves approximately **`r round(accuracy * 100, 1)`%** accuracy, with `Hours.since.posted` as the most statistically robust predictor.
 
 ## Άσκηση 1: Έλεγχος μεταβλητών
 
@@ -140,6 +140,7 @@ instagram_reach$Hashtags <- as.character(instagram_reach$Hashtags)
 Το αρχικό dataset περιείχε 100 παρατηρήσεις και 7 μεταβλητές.
 Η μεταβλητή `S.No` αφαιρέθηκε, καθώς λειτουργεί μόνο ως αριθμός εγγραφής και δεν προσφέρει χρήσιμη πληροφορία για την ανάλυση.
 Το τελικό dataset περιλαμβάνει 100 παρατηρήσεις και 6 μεταβλητές.
+Με αυτή τη δομή, τα δεδομένα είναι πλέον κατάλληλα για τις επόμενες φάσεις ανάλυσης και μοντελοποίησης.
 
 ## Άσκηση 2: Δημιουργία νέων μεταβλητών
 
@@ -160,6 +161,8 @@ kable(time_table,
       caption = "Κατανομή της μεταβλητής time") %>%
   kable_styling(full_width = FALSE, position = "center")
 ```
+
+Η μεταβλητή `time` συνοψίζει τον χρόνο από τη δημοσίευση σε τρεις διακριτές κατηγορίες, ώστε η ερμηνεία να είναι πιο άμεση στις συγκρίσεις που ακολουθούν.
 
 ### Δημιουργία μεταβλητής like
 
@@ -188,6 +191,8 @@ kable(quartiles_table,
   kable_styling(full_width = FALSE, position = "center")
 ```
 
+Η κατηγοριοποίηση της `Likes` με βάση τα τεταρτημόρια επιτρέπει μια σταθερή και διαφανή διάκριση των αναρτήσεων σε χαμηλή, μεσαία και υψηλή αλληλεπίδραση.
+
 ## Άσκηση 3: Ποσοτικές μεταβλητές και περιγραφικά μέτρα
 
 ```{r select-numeric}
@@ -213,6 +218,8 @@ kable(desc_table,
   kable_styling(full_width = FALSE, position = "center") %>%
   row_spec(0, bold = TRUE)
 ```
+
+Τα περιγραφικά μέτρα δείχνουν ότι οι μεταβλητές δεν έχουν ομοιόμορφη συμπεριφορά: ειδικά η `Followers` εμφανίζει μεγαλύτερη διασπορά, γεγονός που επηρεάζει τόσο την οπτική ανάλυση όσο και την ερμηνεία των συσχετίσεων.
 
 ## Άσκηση 4: Γραφική μελέτη της μεταβλητής Followers
 
@@ -516,22 +523,22 @@ ggroc(roc_obj, color = "#E74C3C", linewidth = 1.2) +
   theme_report()
 ```
 
-Η μεταβλητή `Hours.since.posted` εμφανίζει στατιστικά σημαντική θετική επίδραση (p < 0.01), γεγονός που υποδηλώνει ότι όσο αυξάνεται ο χρόνος από τη δημοσίευση, αυξάνεται και η πιθανότητα εμφάνισης υψηλών likes, ενώ η επίδραση των `Followers` είναι ασθενέστερη.
+Η μεταβλητή `Hours.since.posted` παρουσιάζει στατιστικά σημαντική θετική επίδραση (p < 0.01): όσο αυξάνεται ο χρόνος από τη δημοσίευση, τόσο αυξάνεται και η πιθανότητα μια ανάρτηση να ταξινομηθεί ως υψηλής αλληλεπίδρασης. Αντίθετα, η επίδραση των `Followers` παραμένει πιο ήπια.
 
-Η συνολική ακρίβεια του μοντέλου είναι `r round(accuracy, 2)`, δηλαδή το μοντέλο ταξινόμησε σωστά περίπου το `r round(accuracy * 100, 2)`% των παρατηρήσεων.
+Η συνολική ακρίβεια του μοντέλου είναι **`r round(accuracy, 2)`** (ή περίπου **`r round(accuracy * 100, 2)`%**), επομένως η ταξινόμηση είναι ικανοποιητική αλλά όχι επαρκής από μόνη της για πλήρη αξιολόγηση.
 
-Το AUC εκφράζει με απλή γλώσσα την πιθανότητα το μοντέλο να δώσει υψηλότερο σκορ σε ένα πραγματικά high-engagement post από ό,τι σε ένα low/medium post. Επειδή το dataset είναι ανισόρροπο (περίπου 77% Low/Medium έναντι 23% High), η ακρίβεια από μόνη της μπορεί να είναι παραπλανητική: ένας αφελής ταξινομητής που προβλέπει πάντα "Low/Medium" θα πετύχαινε περίπου 77% accuracy χωρίς ουσιαστική προβλεπτική ικανότητα. Για αυτό αξιολογούμε επιπλέον το μοντέλο με AUC και F1-Score.
+Το AUC ερμηνεύεται ως η πιθανότητα το μοντέλο να δώσει υψηλότερο σκορ σε ένα πραγματικά high-engagement post σε σχέση με ένα low/medium post. Επειδή το dataset είναι ανισόρροπο (περίπου 77% Low/Medium έναντι 23% High), η ακρίβεια μπορεί να υπερεκτιμήσει την πραγματική απόδοση· για αυτό εξετάζονται συμπληρωματικά και οι δείκτες AUC και F1-Score.
 
 ## Συμπεράσματα
 
-Από την ανάλυση των δεδομένων προκύπτουν τα εξής βασικά συμπεράσματα:
+Η ανάλυση οδηγεί σε μια συνεκτική εικόνα της συμπεριφοράς των μεταβλητών και της αλληλεπίδρασής τους:
 
-- Υπάρχει θετική αλλά σχετικά ασθενής συσχέτιση μεταξύ των μεταβλητών `Followers` και `Likes`.
-- Η μεταβλητή `Hours.since.posted` εμφανίζει ισχυρότερη θετική σχέση με τα `Likes` σε σύγκριση με τον αριθμό των followers.
-- Η κατανομή της μεταβλητής `Followers` δεν είναι κανονική, καθώς παρουσιάζει έντονη δεξιά ασυμμετρία και ακραίες τιμές.
-- Η κατηγορική μεταβλητή `time` συνδέεται με την κατανομή των `Likes`, αφού μεγαλύτερες τιμές του `time` σχετίζονται με υψηλότερο ποσοστό υψηλών likes.
-- Η δυαδική μεταβλητή `high_like` έδειξε ότι μόνο ένα σχετικά μικρό ποσοστό των αναρτήσεων χαρακτηρίζεται από υψηλή αλληλεπίδραση, γεγονός που υποδηλώνει ανισορροπία μεταξύ των κατηγοριών.
-- Το μοντέλο λογιστικής παλινδρόμησης έδειξε ότι ο χρόνος από τη δημοσίευση (`Hours.since.posted`) αποτελεί στατιστικά σημαντικό παράγοντα για την πρόβλεψη υψηλής αλληλεπίδρασης.
+- Η σχέση `Followers`–`Likes` είναι θετική, αλλά μέτριας έντασης.
+- Η `Hours.since.posted` συνδέεται πιο σταθερά με τα `Likes` σε σύγκριση με τον αριθμό followers.
+- Η κατανομή της `Followers` είναι έντονα δεξιά ασύμμετρη, με ακραίες τιμές που επηρεάζουν τον μέσο όρο.
+- Η μεταβλητή `time` διαφοροποιεί ουσιαστικά τα επίπεδα αλληλεπίδρασης, με υψηλότερες κατηγορίες να εμφανίζουν μεγαλύτερο ποσοστό υψηλών likes.
+- Η μεταβλητή `high_like` επιβεβαιώνει την ανισορροπία των κατηγοριών, στοιχείο που πρέπει να λαμβάνεται υπόψη στην ερμηνεία των μετρικών.
+- Στο μοντέλο λογιστικής παλινδρόμησης, η `Hours.since.posted` αναδεικνύεται ως ο πιο αξιόπιστος προγνωστικός παράγοντας για υψηλή αλληλεπίδραση.
 
 ## Appendix: Reproducibility
 

@@ -1,18 +1,14 @@
 # Exploratory Data Analysis of the Instagram Reach Dataset
 
-**Author:** Sotiris Kylintireas | Student ID: 3220098
+**Author:** Sotiris Kylintireas (Student ID: 3220098)
 **Date:** March 2026
 **Language:** R (R Markdown)
 
----
-
 ## Overview
 
-This project presents a structured **Exploratory Data Analysis (EDA)** of the *Instagram Reach* dataset, a collection of 100 Instagram posts with engagement metrics including follower counts, post age, and likes received.
+This project presents an exploratory data analysis of the *Instagram Reach* dataset, which includes 100 posts and their core engagement characteristics.
 
-The analysis spans descriptive statistics, distributional assessment, bivariate and categorical relationships, and a logistic regression model for predicting high-engagement posts.
-
----
+The report follows a clear workflow: data inspection and preparation, variable engineering, descriptive and visual analysis, and a final logistic regression model for predicting high-engagement posts.
 
 ## Dataset
 
@@ -20,56 +16,46 @@ The analysis spans descriptive statistics, distributional assessment, bivariate 
 |---|---|
 | Observations | 100 posts |
 | Variables (after cleaning) | 6 |
-| Key numeric variables | `Followers`, `Hours.since.posted`, `Likes` |
-| Key categorical variables | `USERNAME`, `time`, `like`, `high_like` |
+| Main numeric variables | `Followers`, `Hours.since.posted`, `Likes` |
+| Main categorical variables | `USERNAME`, `time`, `like`, `high_like` |
 
-> **To run this project:** Place `instagram_reach.txt` in your R working directory before knitting.
+> **Important:** Place `instagram_reach.txt` in your R working directory before knitting the report.
 
----
+## Main Findings
 
-## Key Findings
+- There is a **moderate positive relationship** (r ≈ 0.61) between `Hours.since.posted` and `Likes`, indicating that older posts generally collect more likes.
+- The `Followers` distribution is **strongly right-skewed**, with several high-value outliers.
+- The engineered `time` categories are meaningfully associated with engagement outcomes.
+- In logistic regression, `Hours.since.posted` is the most influential predictor for high engagement, and the model reaches about **77% classification accuracy**.
 
-- 📈 **Moderate positive correlation** (r ≈ 0.61) between `Hours.since.posted` and `Likes` — older posts accumulate more engagement.
-- 📊 **Followers distribution is right-skewed** and non-normal, with notable outliers among high-follower accounts.
-- 🏷️ **Posting recency (`time`) predicts engagement level** — posts in category `time = 4` show the highest rate of high likes.
-- 🤖 **Logistic regression model** using `Followers` and `Hours.since.posted` achieves ~77% accuracy; `Hours.since.posted` is the statistically significant predictor (p < 0.01).
-
----
-
-## Technologies
+## Tools and Libraries
 
 | Tool | Purpose |
 |---|---|
 | R / R Markdown | Analysis and report generation |
-| ggplot2 | All data visualizations |
-| knitr + kableExtra | Report formatting and tables |
-| pROC | ROC curve and AUC computation |
-| dplyr + scales | Data wrangling and formatting |
-
----
+| ggplot2 | Data visualization |
+| knitr + kableExtra | Tables and report formatting |
+| dplyr + scales | Data manipulation and labels |
+| pROC | ROC curve and AUC evaluation |
 
 ## How to Run
 
-1. Clone this repository
-2. Place `instagram_reach.txt` in your R working directory
-3. Open `instagram_analysis.Rmd` in RStudio
-4. Click **Knit → Knit to HTML**
-
----
+1. Clone the repository.
+2. Place `instagram_reach.txt` in your R working directory.
+3. Open `instagram_analysis.Rmd` in RStudio.
+4. Knit the file to HTML (`Knit → Knit to HTML`).
 
 ## Project Structure
 
 ```
 ├── instagram_analysis.Rmd   # Main analysis report
-├── instagram_analysis.html  # Rendered HTML output
-├── instagram_reach.txt      # Dataset (place in working directory)
-└── README.md                # This file
+├── instagram_analysis.html  # Rendered output
+├── instagram_reach.txt      # Input dataset (local placement required)
+└── README.md                # Project overview and usage
 ```
-
----
 
 ## Author
 
-**Sotiris Kylintireas**
+Sotiris Kylintireas
 Student ID: 3220098
-GitHub: <a href="https://github.com/KingKyli">@KingKyli</a>
+GitHub: [@KingKyli](https://github.com/KingKyli)
