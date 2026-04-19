@@ -1,0 +1,23 @@
+# R environment
+.Rhistory
+.RData
+.Ruserdata
+
+# R Markdown / knitr cache and output
+*_cache/
+*_files/
+*.log
+
+# LaTeX intermediate files (produced when knitting to PDF)
+*.aux
+*.out
+*.toc
+*.tex
+*.lof
+*.lot
+*.bbl
+*.blg
+
+# OS metadata
+.DS_Store
+Thumbs.db
