@@ -29,10 +29,10 @@ The analysis spans descriptive statistics, distributional assessment, bivariate 
 
 ## Key Findings
 
-- 📈 **Moderate positive correlation** (r ≈ 0.61) between `Hours.since.posted` and `Likes` — older posts accumulate more engagement.
-- 📊 **Followers distribution is right-skewed** and non-normal, with notable outliers among high-follower accounts.
-- 🏷️ **Posting recency (`time`) predicts engagement level** — posts in category `time = 4` show the highest rate of high likes.
-- 🤖 **Logistic regression model** using `Followers` and `Hours.since.posted` achieves ~77% accuracy; `Hours.since.posted` is the statistically significant predictor (p < 0.01).
+- A moderate positive correlation (r ≈ 0.61) appears between `Hours.since.posted` and `Likes`, indicating that older posts tend to gather more engagement.
+- The `Followers` variable is right-skewed and non-normal, with clear outliers among high-follower accounts.
+- Posting recency (`time`) is associated with engagement, with category `time = 4` showing the highest share of high-like posts.
+- A logistic regression model using `Followers` and `Hours.since.posted` reaches roughly 77% accuracy; `Hours.since.posted` is the statistically significant predictor (p < 0.01).
 
 ---
 
